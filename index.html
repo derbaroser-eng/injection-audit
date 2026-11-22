@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>injection-audit - evidence you can hand to someone</title>
+<meta name="description" content="A static analyser that turns shell and argument injection findings into a dated, signed, tamper-evident audit report. Findings only, never a certificate.">
+<style>
+:root{--bg:#0e1117;--fg:#e6edf3;--mut:#8b949e;--line:#30363d;--card:#161b22}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.wrap{max-width:820px;margin:0 auto;padding:48px 22px 90px}h1{font-size:2.1rem;line-height:1.2;margin:0 0 10px}
+.lede{color:var(--mut);font-size:1.12rem;margin:0 0 30px}pre{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:16px;overflow:auto;font-size:.9rem}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}h2{font-size:1.2rem;margin:34px 0 12px;border-bottom:1px solid var(--line);padding-bottom:8px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:16px 18px;margin:12px 0}
+.tag{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:2px 10px;color:var(--mut);font-size:.78rem;margin:0 6px 6px 0}
+a{color:#58a6ff}.fine{color:var(--mut);font-size:.86rem}.sig{color:#7ee787}
+</style></head><body><div class="wrap">
+<h1>injection-audit</h1>
+<p class="lede">A static analyser for shell and argument injection whose output is a dated, signed report you can hand to someone - and prove, three months later, that it was not edited.</p>
+<div class="card"><span class="tag">Python AST + Bash</span><span class="tag">CWE-78 / CWE-88</span><span class="tag">HMAC-SHA256 signed</span><span class="tag">stdlib only</span><span class="tag">findings, not certification</span></div>
+<h2>Why the report is the product</h2>
+<p>Most scanners print a blob of JSON and leave you to turn it into evidence. This one starts from the opposite end: the report is a fixed, versioned artifact. It carries an ID derived from the tree and the date, per-file SHA-256 hashes of the exact source that was read, and file:line evidence with the offending line quoted. A coverage section says what was analysed, what was skipped, and why. Then the canonical payload is signed with HMAC-SHA256 and the key fingerprint is recorded.</p>
+<p>Anyone with the report and the verification tool can check the signature and the payload hash. No account, no service, no phone-home.</p>
+<h2>What it actually found</h2>
+<p>On a deliberately broken six-file demo app it produced <strong>8 findings</strong> - five in Python, three in Bash - including a shell=True subprocess call tagged as both CWE-78 and CWE-88, and a bash -c expansion flagged in the deploy script. Four files were analysable; a binary and a README were skipped and counted as such rather than silently ignored.</p>
+<pre>$ injection-audit scan ./app --key-file ./key.txt --label demo-app
+SIA-2026-11-22-b22991d5  findings=8 files=4
+json      : report-SIA-2026-11-22-b22991d5.json
+markdown  : report-SIA-2026-11-22-b22991d5.md
+signature : report-SIA-2026-11-22-b22991d5.json.sig
+
+$ injection-audit verify report-SIA-2026-11-22-b22991d5.json
+signature valid   payload_sha256=101a3e5b...</pre>
+<h2>Limits, stated up front</h2>
+<p>Taint tracking is intra-procedural with a conservative branch union; alias tracking through containers and attributes is limited. There is no JavaScript/TypeScript AST, no cross-module dataflow, and no CI gating in this version. The report says this itself - along with a fixed disclaimer that these are findings and dated evidence, not a compliance certificate or a guarantee.</p>
+<p class="fine">Source and docs: <a href="https://github.com/derbaroser-eng/injection-audit">github.com/derbaroser-eng/injection-audit</a></p>
+</div></body></html>
