@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The report that survives being handed over - Elena Brandt</title>
+<meta name="description" content="A field note on injection-audit: a dated, signed, reproducible security artefact.">
+<style>
+:root{--ink:#1c1b19;--muted:#625e56;--line:#ddd7cc;--paper:#fbf9f4;--accent:#7c3a1d}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:17px/1.65 Georgia,serif}
+main{max-width:44rem;margin:0 auto;padding:3.5rem 1.4rem 5rem}
+h1{font-size:2.3rem;line-height:1.15;margin:0 0 .6rem}
+h2{font-size:1.35rem;margin:2.4rem 0 .7rem}
+.byline{color:var(--muted);font:14px/1.4 sans-serif;text-transform:uppercase;margin-bottom:2.2rem}
+p{margin:0 0 1.15rem}
+pre{background:#f1ede4;border:1px solid var(--line);border-left:3px solid var(--accent);padding:1rem;overflow:auto;font:13px/1.6 monospace}
+code{font-family:monospace;font-size:.92em}
+blockquote{margin:1.6rem 0;padding-left:1.2rem;border-left:2px solid var(--accent);color:var(--muted);font-style:italic}
+a{color:var(--accent);text-underline-offset:3px}
+.alt{font:15px/1.5 sans-serif;color:var(--muted)}
+footer{font:14px/1.5 sans-serif;color:var(--muted);border-top:1px solid var(--line);padding-top:1.2rem;margin-top:3rem}
+</style>
+</head>
+<body><main>
+<p class="alt"><a href="../">injection-audit</a> / field note</p>
+<h1>The report that survives being handed over</h1>
+<p class="byline">By Elena Brandt · 23 November 2026</p>
+<p>A finding is easy to produce and hard to defend. The awkward moment is three months later, when somebody asks which version of the file was scanned, and all you have is a screenshot with a line number.</p>
+<p>I built injection-audit to make the opposite of a dashboard: one file that carries its own evidence.</p>
+<h2>What a run actually produced</h2>
+<pre>report      : IA-20261123T000000Z-904ad9a57c9d
+delivered   : 2026-11-23
+repo digest : 904ad9a57c9d7b5c3405da8e8c939257b63d200a44722f9ccd7e6e43a291f8d0
+analysed    : 2 files
+findings    : 2</pre>
+<p>Both findings were CWE-78: <code>os.system("grep -n " + sys.argv[1])</code> in a Python file and <code>eval "echo $name"</code> in a shell script. Ordinary bugs. The part worth writing about is the container they arrive in.</p>
+<p>Each numbered finding carries a rule id, a CWE class, the quoted source line, and a SHA-256 hash for every analysed file. The whole tree gets a digest. A coverage block states what was skipped and why. An HMAC-SHA256 signature covers the canonical JSON payload; the report records only the SHA-256 id of the signing key, never the key itself.</p>
+<h2>Why sign the artefact and not the claim</h2>
+<p>A client can verify the document has not been edited since it was signed, and check the file hashes against the tree, without installing my scanner and without receiving my source code. That is the entire product. The scanner is free and boring; the dated, verifiable record is what a consultancy can actually file.</p>
+<pre>$ python -m injection_audit verify report.json --key-file ia.key
+signature valid for key sha256:da466a4a6b0fa977df6e3ed163f034167900ac97b85fe3f4d834f4531337ef1d</pre>
+<p>Pin the clock with <code>--now</code> and two scans of the same tree are byte-identical, which matters when a client asks for a re-issued copy of a report from last quarter.</p>
+<h2>Limits, in the document itself</h2>
+<p>Taint tracking is intra-file and intra-function. An argv token is only called CWE-88 when the hazard is provable from literals. Unsupported languages, parse failures and oversized files are listed as skipped, never silently dropped.</p>
+<blockquote>This is not a compliance certificate, a penetration test, or a guarantee. It records dated evidence of findings in the analysed files only.</blockquote>
+<p>That line costs me sales and I keep it. A tool that hides its blind spots is worse than no tool.</p>
+<h2>What it costs</h2>
+<p>Single repository report - EUR 49. Team licence, twelve months, unlimited repositories - EUR 249. Write to <a href="mailto:derbaroser@gmail.com">derbaroser@gmail.com</a> and I will send the sample report and the scan checklist first, so you can see exactly what you would be buying.</p>
+<p>The engine covers Python and POSIX shell, ships with 290 passing tests, needs Python 3.9 or newer, and has no third-party dependencies and no network calls.</p>
+<p class="alt">Source: <a href="https://github.com/derbaroser-eng/injection-audit">github.com/derbaroser-eng/injection-audit</a></p>
+<footer>Elena Brandt · growth and field notes · 23 November 2026</footer>
+</main></body></html>
