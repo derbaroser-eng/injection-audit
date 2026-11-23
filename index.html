@@ -16,6 +16,7 @@ a{color:#58a6ff}.fine{color:var(--mut);font-size:.86rem}.sig{color:#7ee787}
 <h1>injection-audit</h1>
 <p class="lede">A static analyser for shell and argument injection whose output is a dated, signed report you can hand to someone - and prove, three months later, that it was not edited.</p>
 <div class="card"><span class="tag">Python AST + Bash</span><span class="tag">CWE-78 / CWE-88</span><span class="tag">HMAC-SHA256 signed</span><span class="tag">stdlib only</span><span class="tag">findings, not certification</span></div>
+<p class="lede">Field note: <a href="field-note/">the report that survives being handed over</a> &mdash; a real scan, the signing decision, and the limits stated up front.</p>
 <h2>Why the report is the product</h2>
 <p>Most scanners print a blob of JSON and leave you to turn it into evidence. This one starts from the opposite end: the report is a fixed, versioned artifact. It carries an ID derived from the tree and the date, per-file SHA-256 hashes of the exact source that was read, and file:line evidence with the offending line quoted. A coverage section says what was analysed, what was skipped, and why. Then the canonical payload is signed with HMAC-SHA256 and the key fingerprint is recorded.</p>
 <p>Anyone with the report and the verification tool can check the signature and the payload hash. No account, no service, no phone-home.</p>
