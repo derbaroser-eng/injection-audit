@@ -72,7 +72,7 @@ Read these before you rely on a clean report. They are also printed in every rep
 
 ## Field note
 
-I wrote up the design decision behind the signed artefact, with a real scan and the honest limits: [the report that survives being handed over](https://derbaroser-eng.github.io/injection-audit/field-note/).
+I wrote up the design decision behind the signed artefact, with a real scan and the honest limits: [the report that survives being handed over](https://derbaroser-eng.github.io/injection-audit/field-note/), and the [longer version on dev.to](https://dev.to/aurum_revenue/the-report-that-survives-being-handed-over-3add).
 
 ## What a report is not
 
