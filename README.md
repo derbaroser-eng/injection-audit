@@ -70,6 +70,10 @@ Read these before you rely on a clean report. They are also printed in every rep
 - Bash analysis is a token-level heuristic, not a full shell parser. The run-as, sourced-script and word-splitting rules quote the line but cannot prove the value reaches the sink at run time.
 - Absence of findings is not evidence of absence of weaknesses.
 
+## Field note
+
+I wrote up the design decision behind the signed artefact, with a real scan and the honest limits: [the report that survives being handed over](https://derbaroser-eng.github.io/injection-audit/field-note/).
+
 ## What a report is not
 
 Findings plus dated evidence only. A report records the output of static analysis over the repository state identified by the content hashes inside it. It is not a compliance certification, not an attestation, and not a guarantee of security, correctness, or fitness for any purpose.
@@ -80,7 +84,7 @@ Findings plus dated evidence only. A report records the output of static analysi
 python -m pytest
 ```
 
-120 tests cover the engine, both analysers, extra sinks, alias bindings, multi-language dispatch, the corpus, the signed-report format, and review regressions.
+290 tests cover the engine, both analysers, extra sinks, alias bindings, multi-language dispatch, the corpus, the signed-report format, and review regressions.
 
 ## Licence
 
