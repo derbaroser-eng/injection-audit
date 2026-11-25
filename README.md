@@ -84,8 +84,10 @@ Findings plus dated evidence only. A report records the output of static analysi
 python -m pytest
 ```
 
-290 tests cover the engine, both analysers, extra sinks, alias bindings, multi-language dispatch, the corpus, the signed-report format, and review regressions.
+149 tests cover the engine, both analysers, extra sinks, alias bindings, multi-language dispatch, the corpus, the signed-report format, and review regressions.
 
 ## Licence
 
-MIT. See LICENSE.
+The source is MIT. See LICENSE.
+
+A commercial licence is available for teams that embed injection-audit in a proprietary or distributed product and need to drop the MIT attribution and source-disclosure obligations, plus a support thread. It is EUR 49 once: <https://buy.stripe.com/bJefZk7PY6g85mF7lS4ko0W>. Terms: LICENSE-COMMERCIAL.md. The MIT source and the full write-up stay free on <https://derbaroser-eng.github.io/injection-audit/>.

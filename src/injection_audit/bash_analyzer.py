@@ -22,7 +22,7 @@ _SU_COMMAND = re.compile(r"(?:^|\s)(?:-c|--command)(?=\s|$)")
 _SOURCE_CMD = re.compile(
     r"""(?:^|[\s;=])(?:source|\.)\s+("[^"]*"|'[^']*'|\S+)""")
 _INTERP_ANY = re.compile(r"(?:^|[\s;])" + _PATH +
-                         r"(bash|sh|zsh|dash|ksh)\b\s*((?:-[A-Za-z]+\s+)*)(.+)$")
+                         r"(bash|sh|zsh|dash|ksh)\b\s*((?:--?[A-Za-z][A-Za-z-]*\s+)*)(\S+)(.*)$")
 # helpers that word-split and glob their arguments
 _XARGS = re.compile(r"(?:^|[\s;=|])(xargs)\b\s*(.*)$")
 _FIND_EXEC = re.compile(r"(?:^|[\s;=|])(find)\b.*?-(exec|execdir)\b\s*(.*)$")
@@ -85,6 +85,20 @@ class BashAnalyzer:
     def _constant(text):
         return not _EXPANSION.search(text)
 
+    @staticmethod
+    def _outside_quotes(text, pos):
+        """True when pos is not inside a quoted span.
+
+        Keeps `echo "use sudo $x"` from being read as a run-as command while
+        leaving `sudo rm -rf "$dest"` detectable.
+        """
+        limit = len(text)
+        for quote in ('"', "'"):
+            index = text.find(quote)
+            if index != -1:
+                limit = min(limit, index)
+        return pos <= limit
+
     def _tainted_expansions(self, text, tainted_vars):
         out = []
         for match in _EXPANSION.finditer(text):
@@ -110,21 +124,21 @@ class BashAnalyzer:
 
     def _check_line(self, number, text, tainted_vars):
         eval_match = _EVAL.search(text)
-        if eval_match:
+        if eval_match and self._outside_quotes(text, eval_match.start()):
             arg = eval_match.group(1).strip()
             bad = self._tainted_expansions(arg, tainted_vars)
             if bad or not self._constant(arg):
                 self._add("SIA-78-10", number, eval_match.start(1),
                           text.strip(), ", ".join(bad) or "non-constant eval argument")
         interp = _INTERP_C.search(text)
-        if interp:
+        if interp and self._outside_quotes(text, interp.start()):
             arg = interp.group(3).strip()
             bad = self._tainted_expansions(arg, tainted_vars)
             if bad or not self._constant(arg):
                 self._add("SIA-78-11", number, interp.start(3),
                           text.strip(), ", ".join(bad) or "non-constant -c argument")
         ssh = _SSH.search(text)
-        if ssh:
+        if ssh and self._outside_quotes(text, ssh.start()):
             arg = ssh.group(2).strip()
             bad = self._tainted_expansions(arg, tainted_vars)
             if bad:
@@ -137,7 +151,7 @@ class BashAnalyzer:
     def _check_run_as(self, number, text, tainted_vars):
         """sudo/doas/su executing non-constant command text."""
         match = _RUNAS.search(text)
-        if match:
+        if match and self._outside_quotes(text, match.start()):
             remainder = match.group(2)
             bad = self._tainted_expansions(remainder, tainted_vars)
             if bad:
@@ -145,7 +159,7 @@ class BashAnalyzer:
                           text.strip(), ", ".join(bad))
                 return
         match = _SU.search(text)
-        if not match:
+        if not match or not self._outside_quotes(text, match.start()):
             return
         remainder = match.group(1)
         if not _SU_COMMAND.search(remainder):
@@ -159,7 +173,7 @@ class BashAnalyzer:
     def _check_sourced_script(self, number, text, tainted_vars):
         """`source FILE`, `. FILE`, and an interpreter reading a script path."""
         match = _SOURCE_CMD.search(text)
-        if match:
+        if match and self._outside_quotes(text, match.start()):
             arg = match.group(1)
             bad = self._tainted_expansions(arg, tainted_vars)
             if bad or not self._constant(arg):
@@ -168,10 +182,14 @@ class BashAnalyzer:
                           ", ".join(bad) or "non-constant script path")
             return
         interp = _INTERP_ANY.search(text)
-        if not interp:
+        if not interp or not self._outside_quotes(text, interp.start()):
             return
         flags, arg = interp.group(2), interp.group(3).strip()
-        if any("c" in flag[1:] for flag in flags.split() if flag.startswith("-")):
+        has_c_flag = any(
+            flag == "--command"
+            or (flag.startswith("-") and not flag.startswith("--") and "c" in flag[1:])
+            for flag in flags.split())
+        if has_c_flag:
             return  # the -c form is already reported as SIA-78-11
         bad = self._tainted_expansions(arg, tainted_vars)
         if bad or not self._constant(arg):
@@ -182,13 +200,13 @@ class BashAnalyzer:
     def _check_word_split_helpers(self, number, text, tainted_vars):
         """xargs and find -exec receive attacker-influenced words."""
         match = _XARGS.search(text)
-        if match:
+        if match and self._outside_quotes(text, match.start()):
             bad = self._tainted_expansions(match.group(2), tainted_vars)
             if bad:
                 self._add("SIA-88-04", number, match.start(2),
                           text.strip(), ", ".join(bad))
         match = _FIND_EXEC.search(text)
-        if match:
+        if match and self._outside_quotes(text, match.start(2)):
             bad = self._tainted_expansions(match.group(3), tainted_vars)
             if bad:
                 self._add("SIA-88-04", number, match.start(3),

@@ -31,10 +31,15 @@ def is_source_attribute(name):
         return False
     if name in SOURCE_ATTR_LABELS:
         return True
-    head, _, tail = name.partition(".")
-    if head in ("request", "req"):
-        return bool(tail)
-    return name.startswith(("flask.request.", "django."))
+    root, _, tail = name.partition(".")
+    if root in ("request", "req"):
+        return f"request.{tail}" in SOURCE_ATTR_LABELS
+    if root in ("flask", "django") and tail:
+        # framework-qualified form, e.g. flask.request.args
+        sub, _, rest = tail.partition(".")
+        if sub in ("request", "req") and rest:
+            return f"request.{rest}" in SOURCE_ATTR_LABELS
+    return False
 
 
 def dotted_name(node):

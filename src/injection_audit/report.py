@@ -73,17 +73,25 @@ def sign_report(report, key: bytes, key_id: str = "audit-signing-key"):
 
 
 def verify_report(report, key: bytes) -> bool:
+    """Verify the HMAC. Malformed input is a rejection, never an exception."""
+    if not isinstance(key, (bytes, bytearray)):
+        return False
     signature = report.get("signature")
     if not isinstance(signature, dict):
         return False
+    value = signature.get("value")
+    digest = signature.get("payload_sha256")
+    if not isinstance(value, str) or not isinstance(digest, str):
+        return False
     if signature.get("alg") != "HMAC-SHA256":
         return False
-    if signature.get("key_fingerprint") != key_fingerprint(key):
+    if signature.get("key_fingerprint") != key_fingerprint(bytes(key)):
         return False
-    if signature.get("payload_sha256") != hashlib.sha256(canonical_bytes(report)).hexdigest():
+    payload = canonical_bytes(report)
+    if digest != hashlib.sha256(payload).hexdigest():
         return False
-    expected = hmac.new(key, canonical_bytes(report), hashlib.sha256).hexdigest()
-    return hmac.compare_digest(expected, signature.get("value", ""))
+    expected = hmac.new(bytes(key), payload, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, value)
 
 
 def build_report(file_results, root_label, inventory=None, generated_at=None,
@@ -152,6 +160,7 @@ def build_report(file_results, root_label, inventory=None, generated_at=None,
             "files_total": coverage_in.get("files_total"),
             "by_extension": coverage_in.get("by_extension", {}),
             "analysable": coverage_in.get("analysable_paths", []),
+            "lossy_decode": coverage_in.get("lossy_decode", []),
             "skipped": coverage_in.get("skipped", []),
             "parse_errors": errors,
             "findings_by_language": dict(sorted(by_language.items())),
@@ -200,6 +209,7 @@ def render_markdown(report) -> str:
         f"- Files seen: {coverage.get('files_total')}",
         f"- Extensions: {json.dumps(coverage.get('by_extension', {}), sort_keys=True)}",
         f"- Analysable files: {len(coverage.get('analysable', []))}",
+        f"- Decoded lossily (non-UTF-8 source): {len(coverage.get('lossy_decode', []))}",
         f"- Parse errors: {len(coverage.get('parse_errors', []))}",
     ]
     for item in coverage.get("skipped", []):

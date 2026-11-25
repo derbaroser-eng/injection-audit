@@ -1,0 +1,18 @@
+{
+  "product": "injection-audit",
+  "stripe_product_id": "prod_Vgyy54ZF19jAwN",
+  "stripe_price_id": "price_1Ufb0SV05gWq3LvXf7nakSLL",
+  "payment_link_id": "plink_1Ufb0TV05gWq3LvXBOGOvjyw",
+  "url": "https://buy.stripe.com/bJefZk7PY6g85mF7lS4ko0W",
+  "amount_eur": 49.0,
+  "currency": "eur",
+  "mode": "live",
+  "after_completion": {
+    "redirect": {
+      "url": "https://derbaroser-eng.github.io/injection-audit/thanks.html"
+    },
+    "type": "redirect"
+  },
+  "api_verified_at": "2026-11-25T07:52:45+00:00",
+  "evidence": "GET /v1/payment_links expand line_items.data.price -> unit_amount=4900 currency=eur"
+}

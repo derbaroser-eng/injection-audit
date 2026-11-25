@@ -101,7 +101,9 @@ class PythonAnalyzer:
         self._collect_edges()
         self._build_bindings()
         self._fixpoint()
-        self._bindings = self.module_bindings
+        # Module-level imports apply from their own line onward: a call before
+        # the import would raise NameError at runtime, so it is not a sink.
+        self._bindings = {}
         self._run_block(self.module_stmts, dict(self.global_env), collect=True)
         for key in sorted(self.functions):
             node = self.functions[key][0]
@@ -112,19 +114,32 @@ class PythonAnalyzer:
 
     # --------------------------------------------------------------- bindings
     def _build_bindings(self):
-        """Resolve import aliases and simple rebindings that hide a sink.
+        """Collect the import aliases visible in each scope.
 
-        `import subprocess as sp`, `from subprocess import run` and
-        `run = subprocess.run` all name the same sink. Without this pass the
-        analyser only matches literal dotted names and reports a clean bill of
-        health for code that is not clean.
+        Only imports are resolved up front. Assignment rebindings are applied
+        live while scanning, in statement order, so a later rebinding cannot
+        retroactively hide (or invent) a sink at an earlier call site.
         """
-        self.module_bindings = self._scope_bindings(self.module_stmts, {})
+        self.module_bindings = self._import_bindings(self.module_stmts, {})
         self.func_bindings = {}
         for key in sorted(self.functions):
             node = self.functions[key][0]
-            self.func_bindings[key] = self._scope_bindings(node.body,
-                                                           self.module_bindings)
+            table = self._import_bindings(node.body, self.module_bindings)
+            # a parameter or *args/**kwargs name shadows any module-level alias
+            for name in self._local_names(node):
+                table.pop(name, None)
+            self.func_bindings[key] = table
+
+    def _local_names(self, node):
+        args = node.args
+        names = [a.arg for a in getattr(args, "posonlyargs", []) or []]
+        names += [a.arg for a in args.args]
+        if args.vararg:
+            names.append(args.vararg.arg)
+        names += [a.arg for a in args.kwonlyargs]
+        if args.kwarg:
+            names.append(args.kwarg.arg)
+        return names
 
     @staticmethod
     def _resolve_chain(name, table, hops=4):
@@ -145,7 +160,27 @@ class PythonAnalyzer:
             return None
         return self._resolve_chain(dn, table)
 
-    def _scope_bindings(self, stmts, inherited):
+    def _bind(self, name, value_node):
+        """Record (or clear) a local name binding during the scan."""
+        if not isinstance(name, str):
+            return
+        target = self._dotted_target(value_node, self._current_bindings())
+        if target:
+            self._bindings[name] = target
+        else:
+            self._bindings.pop(name, None)
+
+    def _bind_target(self, target, value_node):
+        """Update local alias bindings for one assignment target."""
+        if isinstance(target, ast.Name):
+            self._bind(target.id, value_node)
+        elif isinstance(target, (ast.Tuple, ast.List)):
+            for elt in target.elts:
+                self._bind_target(elt, value_node)
+        elif isinstance(target, ast.Starred):
+            self._bind_target(target.value, value_node)
+
+    def _import_bindings(self, stmts, inherited):
         table = dict(inherited)
 
         def visit(node):
@@ -162,12 +197,6 @@ class PythonAnalyzer:
                             continue
                         table[alias.asname or alias.name] = f"{node.module}.{alias.name}"
                 return
-            if isinstance(node, ast.Assign):
-                target = self._dotted_target(node.value, table)
-                if target:
-                    for lhs in node.targets:
-                        if isinstance(lhs, ast.Name):
-                            table[lhs.id] = target
             for child in ast.iter_child_nodes(node):
                 if isinstance(child, _FLOW_NODES):
                     # nested functions/classes get their own binding scope
@@ -356,9 +385,28 @@ class PythonAnalyzer:
                     env.pop(key, None)
 
     def _run_stmt(self, node, env, collect):
+        if isinstance(node, ast.Import):
+            if collect:
+                for alias in node.names:
+                    root = alias.name.split(".")[0]
+                    self._bindings[alias.asname or root] = (
+                        alias.name if alias.asname else root)
+            return env, False, None
+        if isinstance(node, ast.ImportFrom):
+            # relative imports cannot be resolved without package context
+            if collect and node.module and not node.level:
+                for alias in node.names:
+                    if alias.name == "*":
+                        continue
+                    self._bindings[alias.asname or alias.name] = (
+                        f"{node.module}.{alias.name}")
+            return env, False, None
         if isinstance(node, ast.Assign):
             self._scan_expr(node.value, env, collect)
             tainted, label = expression_taint(node.value, env, self._fr(), self._current_bindings())
+            if collect:
+                for target in node.targets:
+                    self._bind_target(target, node.value)
             for target in node.targets:
                 self._assign(target, tainted, label, env)
             return env, False, None
@@ -366,6 +414,8 @@ class PythonAnalyzer:
             if node.value is not None:
                 self._scan_expr(node.value, env, collect)
                 tainted, label = expression_taint(node.value, env, self._fr(), self._current_bindings())
+                if collect:
+                    self._bind_target(node.target, node.value)
                 self._assign(node.target, tainted, label, env)
             return env, False, None
         if isinstance(node, ast.AugAssign):

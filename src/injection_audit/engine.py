@@ -143,6 +143,7 @@ def inventory_repo(root):
     by_extension = {}
     skipped = []
     analysable = []
+    lossy = []
     total = 0
     for path, name in _walk(root):
         total += 1
@@ -156,6 +157,12 @@ def inventory_repo(root):
             skipped.append({"path": rel, "reason": f"unreadable: {exc.strerror}"})
             continue
         reason = _classify(raw)
+        if reason == "not valid UTF-8" and lang is not None:
+            # analyze_file decodes a recognised source lossily and analyses it;
+            # the inventory must agree, or the report contradicts itself.
+            analysable.append(rel)
+            lossy.append(rel)
+            continue
         if reason:
             skipped.append({"path": rel, "reason": reason})
             continue
@@ -167,5 +174,6 @@ def inventory_repo(root):
         "files_total": total,
         "by_extension": dict(sorted(by_extension.items())),
         "analysable_paths": sorted(analysable),
+        "lossy_decode": sorted(lossy),
         "skipped": skipped,
     }
